@@ -76,13 +76,35 @@ def upsert_silver_tickets(con: duckdb.DuckDBPyConnection, day: str) -> dict:
     """)
     (n_changes,) = con.execute("SELECT count(*) FROM _latest_changes").fetchone()
 
-    # Write this batch's changes to Silver.
-    # A delete arrives as a change with is_deleted = true and every PII column null.
+    # Merge by ticket_id so the latest LSN wins and stale replays cannot overwrite a
+    # newer state. Delete events become a tombstone row: keep the row, set PII fields to
+    # NULL, and flag it deleted.
     con.execute("""
-        INSERT INTO silver_tickets
-        SELECT ticket_id, user_id, subject, body, priority, status, category,
-               created_at, updated_at, is_deleted, _lsn, _batch_id
-        FROM _latest_changes
+        MERGE INTO silver_tickets AS t
+        USING _latest_changes AS s
+        ON t.ticket_id = s.ticket_id
+        WHEN MATCHED AND s._lsn > t._lsn THEN UPDATE SET
+            user_id = CASE WHEN s.is_deleted THEN NULL ELSE s.user_id END,
+            subject = CASE WHEN s.is_deleted THEN NULL ELSE s.subject END,
+            body = CASE WHEN s.is_deleted THEN NULL ELSE s.body END,
+            priority = CASE WHEN s.is_deleted THEN NULL ELSE s.priority END,
+            status = CASE WHEN s.is_deleted THEN NULL ELSE s.status END,
+            category = CASE WHEN s.is_deleted THEN NULL ELSE s.category END,
+            created_at = CASE WHEN s.is_deleted THEN NULL ELSE s.created_at END,
+            updated_at = CASE WHEN s.is_deleted THEN NULL ELSE s.updated_at END,
+            is_deleted = s.is_deleted,
+            _lsn = s._lsn,
+            _batch_id = s._batch_id
+        WHEN NOT MATCHED THEN INSERT VALUES (
+            s.ticket_id, CASE WHEN s.is_deleted THEN NULL ELSE s.user_id END,
+            CASE WHEN s.is_deleted THEN NULL ELSE s.subject END,
+            CASE WHEN s.is_deleted THEN NULL ELSE s.body END,
+            CASE WHEN s.is_deleted THEN NULL ELSE s.priority END,
+            CASE WHEN s.is_deleted THEN NULL ELSE s.status END,
+            CASE WHEN s.is_deleted THEN NULL ELSE s.category END,
+            CASE WHEN s.is_deleted THEN NULL ELSE s.created_at END,
+            CASE WHEN s.is_deleted THEN NULL ELSE s.updated_at END,
+            s.is_deleted, s._lsn, s._batch_id)
     """)
     (n_rows,) = con.execute("SELECT count(*) FROM silver_tickets").fetchone()
     return {"changes_in_batch": n_changes, "silver_rows": n_rows}

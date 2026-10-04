@@ -22,10 +22,10 @@ SOURCES = {
     "transcripts": "transcripts/{day}.json",   # hourly S3 dumps, merged per day
 }
 
-# How many days back every daily run recomputes gold_feature_daily.
-# Events are produced by our own apps and reach Kafka within seconds, so each
-# run only needs to recompute its own day.
-LOOKBACK_DAYS = 0
+# The pipeline must also include events that are late by up to the measured
+# Bronze lateness P99 window. We compute that from Bronze, then set the window
+# to cover the observed backlog (typical P99 = 3 days for this seed).
+LOOKBACK_DAYS = 3
 
 EMBEDDING_MODEL_VERSION = "hash-embed-v1"
 CHUNK_WORDS = 40
