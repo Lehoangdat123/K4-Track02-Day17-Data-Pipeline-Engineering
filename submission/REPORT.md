@@ -5,7 +5,7 @@ Phần phân tích tối đa một trang, không tính output ở phần 5.
 
 **Họ tên / MSSV:** Lê Hoàng Đạt / 2A202602583
 **Repo:** `K4-Track02-Day17-Data-Pipeline-Engineering`
-**Commit bài nộp:** N/A (chưa commit/push)
+**Commit bài nộp:** đã commit và push lên github
 **AI đã dùng và phạm vi hỗ trợ (hoặc không dùng):** Không dùng
 **Nguồn tham khảo khác (nếu có):** N/A
 
